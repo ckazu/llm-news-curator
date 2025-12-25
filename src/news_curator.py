@@ -82,36 +82,127 @@ class NewsCurator:
         logger.debug(f"Response candidates: {response.candidates}")
 
         # grounding metadata から参照元を取得
-        grounding_sources = self._extract_grounding_sources(response)
-        if grounding_sources:
-            logger.debug(f"Grounding sources: {grounding_sources}")
+        chunks, supports = self._extract_grounding_metadata(response)
 
-        # 本文に参照元を追加
-        text = response.text
-        if grounding_sources:
-            text += "\n───────────────────\n\n:link: *参照元*\n"
-            for source in grounding_sources:
-                title = source.get("title", "リンク")
-                uri = source.get("uri", "")
-                if uri:
-                    text += f"• <{uri}|{title}>\n"
+        # 各ニュース項目に参照元を挿入
+        text = self._insert_sources_per_item(response.text, chunks, supports)
 
         return text
 
-    def _extract_grounding_sources(self, response) -> list[dict]:
-        """Extract grounding sources from response metadata."""
-        sources = []
+    def _insert_sources_per_item(
+        self, text: str, chunks: list[dict], supports: list[dict]
+    ) -> str:
+        """Insert source links at the end of each news item based on grounding supports."""
+        if not chunks or not supports:
+            logger.debug("No chunks or supports available, returning original text")
+            return text
+
+        separator = "───────────────────"
+        parts = text.split(separator)
+
+        if len(parts) <= 1:
+            # 区切り線がない場合は最後に全ソースを追加
+            return self._append_all_sources(text, chunks)
+
+        # 各パートの開始位置を計算
+        part_positions = []
+        current_pos = 0
+        for part in parts:
+            part_positions.append({
+                "start": current_pos,
+                "end": current_pos + len(part),
+                "text": part,
+            })
+            current_pos += len(part) + len(separator)
+
+        # 各パートに対応するソースを特定
+        result_parts = []
+        for i, part_info in enumerate(part_positions):
+            part_text = part_info["text"]
+
+            # 最後のパート（感想セクション）には参照元を追加しない
+            is_last_part = i == len(part_positions) - 1
+            if is_last_part:
+                result_parts.append(part_text)
+                continue
+
+            # このパートに対応するソースを収集
+            source_indices = set()
+            for support in supports:
+                segment = support.get("segment", {})
+                seg_start = segment.get("start_index", 0)
+                seg_end = segment.get("end_index", 0)
+
+                # セグメントがこのパートと重なるか確認（部分的な重なりもOK）
+                if seg_start < part_info["end"] and seg_end > part_info["start"]:
+                    for idx in support.get("chunk_indices", []):
+                        if idx < len(chunks):
+                            source_indices.add(idx)
+
+            # ソースリンクを追加
+            if source_indices:
+                sources_text = "\n:link: 参照元: "
+                source_links = []
+                for idx in sorted(source_indices):
+                    chunk = chunks[idx]
+                    title = chunk.get("title", "リンク")
+                    uri = chunk.get("uri", "")
+                    if uri:
+                        source_links.append(f"<{uri}|{title}>")
+                sources_text += " | ".join(source_links)
+                part_text = part_text.rstrip() + sources_text + "\n"
+
+            result_parts.append(part_text)
+
+        return separator.join(result_parts)
+
+    def _append_all_sources(self, text: str, chunks: list[dict]) -> str:
+        """Append all sources at the end of the text."""
+        text += "\n───────────────────\n\n:link: *参照元*\n"
+        for chunk in chunks:
+            title = chunk.get("title", "リンク")
+            uri = chunk.get("uri", "")
+            if uri:
+                text += f"• <{uri}|{title}>\n"
+        return text
+
+    def _extract_grounding_metadata(self, response) -> tuple[list[dict], list[dict]]:
+        """Extract grounding chunks and supports from response metadata."""
+        chunks = []
+        supports = []
         try:
             for candidate in response.candidates:
                 if hasattr(candidate, "grounding_metadata") and candidate.grounding_metadata:
                     metadata = candidate.grounding_metadata
-                    if hasattr(metadata, "grounding_chunks"):
+
+                    # Extract grounding chunks
+                    if hasattr(metadata, "grounding_chunks") and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
                             if hasattr(chunk, "web") and chunk.web:
-                                sources.append({
+                                chunks.append({
                                     "title": getattr(chunk.web, "title", ""),
                                     "uri": getattr(chunk.web, "uri", ""),
                                 })
+
+                    # Extract grounding supports
+                    if hasattr(metadata, "grounding_supports") and metadata.grounding_supports:
+                        for support in metadata.grounding_supports:
+                            segment = getattr(support, "segment", None)
+                            support_data = {
+                                "chunk_indices": getattr(support, "grounding_chunk_indices", []),
+                                "confidence_scores": getattr(support, "confidence_scores", []),
+                            }
+                            if segment:
+                                support_data["segment"] = {
+                                    "start_index": getattr(segment, "start_index", 0),
+                                    "end_index": getattr(segment, "end_index", 0),
+                                    "text": getattr(segment, "text", ""),
+                                }
+                            supports.append(support_data)
+
+                    logger.debug(f"Grounding chunks: {chunks}")
+                    logger.debug(f"Grounding supports: {supports}")
+
         except Exception as e:
-            logger.warning(f"Failed to extract grounding sources: {e}")
-        return sources
+            logger.warning(f"Failed to extract grounding metadata: {e}")
+        return chunks, supports
