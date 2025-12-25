@@ -27,13 +27,15 @@ def main() -> int:
 
         curator = NewsCurator(config)
         logger.info("Fetching news with Google Search grounding...")
-        content = curator.fetch_news()
-        logger.info(f"Received {len(content)} characters of content")
-        logger.debug(f"Content:\n{content}")
+        items = curator.fetch_news()
+        logger.info(f"Received {len(items)} news items")
+        for i, item in enumerate(items):
+            logger.debug(f"Item {i + 1}: {item.text[:100]}...")
+            logger.debug(f"  Sources: {len(item.sources)}, Impression: {item.is_impression}")
 
         poster = SlackPoster(config)
         logger.info("Posting to Slack...")
-        success = poster.post_news(content)
+        success = poster.post_news(items)
 
         if success:
             logger.info("News posted successfully")

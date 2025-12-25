@@ -1,10 +1,14 @@
 import logging
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from .config import Config
+
+if TYPE_CHECKING:
+    from .news_curator import NewsItem
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +24,16 @@ class SlackPoster:
         self.header = config.slack_header
         self.model_name = config.model_name
 
-    def post_news(self, content: str) -> bool:
-        """Post news content to Slack.
+    def post_news(self, items: list["NewsItem"]) -> bool:
+        """Post news items to Slack using Block Kit.
 
         Args:
-            content: The news content from the LLM.
+            items: List of NewsItem objects with text and sources.
 
         Returns:
             True if successful, False otherwise.
         """
-        blocks = self._build_blocks(content)
+        blocks = self._build_blocks(items)
 
         try:
             response = self.client.chat_postMessage(
@@ -43,7 +47,7 @@ class SlackPoster:
             logger.error(f"Slack API error: {e.response['error']}")
             return False
 
-    def _build_blocks(self, content: str) -> list[dict]:
+    def _build_blocks(self, items: list["NewsItem"]) -> list[dict]:
         """Build Slack Block Kit blocks for the message."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -56,12 +60,41 @@ class SlackPoster:
                     "emoji": True,
                 },
             },
-            {"type": "divider"},
         ]
 
-        content_blocks = self._split_content_into_blocks(content)
-        blocks.extend(content_blocks)
+        # 各ニュース項目をブロックに変換
+        for i, item in enumerate(items):
+            # 項目間に divider を追加（最初の項目の前にも）
+            blocks.append({"type": "divider"})
 
+            # ニュース本文
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": item.text,
+                    },
+                }
+            )
+
+            # 参照元（感想以外で、ソースがある場合）
+            if not item.is_impression and item.sources:
+                source_links = self._format_source_links(item.sources)
+                if source_links:
+                    blocks.append(
+                        {
+                            "type": "context",
+                            "elements": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f":link: {source_links}",
+                                }
+                            ],
+                        }
+                    )
+
+        # フッター
         blocks.extend(
             [
                 {"type": "divider"},
@@ -79,46 +112,12 @@ class SlackPoster:
 
         return blocks
 
-    def _split_content_into_blocks(self, content: str) -> list[dict]:
-        """Split content into multiple blocks if it exceeds the limit."""
-        if len(content) <= MAX_BLOCK_TEXT_LENGTH:
-            return [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": content,
-                    },
-                }
-            ]
-
-        blocks = []
-        remaining = content
-
-        while remaining:
-            if len(remaining) <= MAX_BLOCK_TEXT_LENGTH:
-                chunk = remaining
-                remaining = ""
-            else:
-                split_pos = remaining.rfind("\n", 0, MAX_BLOCK_TEXT_LENGTH)
-                if split_pos == -1:
-                    split_pos = MAX_BLOCK_TEXT_LENGTH
-                elif split_pos == 0:
-                    # Newline at the very start would create an empty chunk; skip it.
-                    remaining = remaining.lstrip("\n")
-                    continue
-
-                chunk = remaining[:split_pos]
-                remaining = remaining[split_pos:].lstrip("\n")
-
-            blocks.append(
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": chunk,
-                    },
-                }
-            )
-
-        return blocks
+    def _format_source_links(self, sources: list[dict]) -> str:
+        """Format source links for display."""
+        links = []
+        for source in sources:
+            title = source.get("title", "リンク")
+            uri = source.get("uri", "")
+            if uri:
+                links.append(f"<{uri}|{title}>")
+        return " | ".join(links)
