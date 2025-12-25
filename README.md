@@ -80,8 +80,6 @@ cp .env.example .env
 
 # 実行
 uv run python -m src.main
-# または
-uv run llm-news-curator
 ```
 
 > **Note**: ローカル開発では `gcloud auth application-default login` で認証するため、サービスアカウントキーは不要です。
