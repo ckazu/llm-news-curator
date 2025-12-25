@@ -103,6 +103,10 @@ class SlackPoster:
                 split_pos = remaining.rfind("\n", 0, MAX_BLOCK_TEXT_LENGTH)
                 if split_pos == -1:
                     split_pos = MAX_BLOCK_TEXT_LENGTH
+                elif split_pos == 0:
+                    # Newline at the very start would create an empty chunk; skip it.
+                    remaining = remaining.lstrip("\n")
+                    continue
 
                 chunk = remaining[:split_pos]
                 remaining = remaining[split_pos:].lstrip("\n")
