@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 from dotenv import load_dotenv
@@ -7,8 +8,9 @@ from .config import Config
 from .news_curator import NewsCurator
 from .slack_poster import SlackPoster
 
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level, logging.INFO),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ def main() -> int:
         logger.info("Fetching news with Google Search grounding...")
         content = curator.fetch_news()
         logger.info(f"Received {len(content)} characters of content")
+        logger.debug(f"Content:\n{content}")
 
         poster = SlackPoster(config)
         logger.info("Posting to Slack...")
