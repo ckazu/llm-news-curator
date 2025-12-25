@@ -93,14 +93,16 @@ gcloud iam workload-identity-pools providers describe "github-provider" \
 gcloud auth application-default login
 
 # 依存関係のインストール
-pip install -r requirements.txt
+uv sync
 
 # 環境変数の設定
 cp .env.example .env
 # .env を編集して GCP_PROJECT_ID, Slack設定, CURATOR_TOPIC を設定
 
 # 実行
-python -m src.main
+uv run python -m src.main
+# または
+uv run llm-news-curator
 ```
 
 > **Note**: ローカル開発では `gcloud auth application-default login` で認証するため、サービスアカウントキーは不要です。
@@ -154,7 +156,8 @@ llm-news-curator/
 │   ├── news_curator.py          # Vertex AI 連携
 │   ├── slack_poster.py          # Slack 投稿
 │   └── config.py                # 設定管理
-├── requirements.txt
+├── pyproject.toml               # uv 依存関係管理
+├── uv.lock
 ├── .env.example
 └── README.md
 ```
