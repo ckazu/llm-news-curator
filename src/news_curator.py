@@ -51,6 +51,8 @@ class NewsCurator:
     """Curates news using Vertex AI with Google Search grounding."""
 
     SEPARATOR = "───────────────────"
+    # 短すぎるセグメントテキストは複数パートに誤マッチする可能性があるため除外
+    MIN_SEGMENT_TEXT_LENGTH = 10
 
     def __init__(self, config: Config):
         self.config = config
@@ -105,24 +107,11 @@ class NewsCurator:
             # 区切り線がない場合は最後に全ソースを追加
             return self._append_all_sources(text, chunks)
 
-        # 各パートの開始位置を計算
-        part_positions = []
-        current_pos = 0
-        for part in parts:
-            part_positions.append({
-                "start": current_pos,
-                "end": current_pos + len(part),
-                "text": part,
-            })
-            current_pos += len(part) + len(self.SEPARATOR)
-
-        # 各パートに対応するソースを特定
+        # 各パートに対応するソースを特定（テキストマッチング方式）
         result_parts = []
-        for i, part_info in enumerate(part_positions):
-            part_text = part_info["text"]
-
+        for i, part_text in enumerate(parts):
             # 最後のパート（感想セクション）には参照元を追加しない
-            is_last_part = i == len(part_positions) - 1
+            is_last_part = i == len(parts) - 1
             if is_last_part:
                 result_parts.append(part_text)
                 continue
@@ -131,20 +120,25 @@ class NewsCurator:
             source_indices = set()
             for support in supports:
                 segment = support.get("segment", {})
-                seg_start = segment.get("start_index", 0)
-                seg_end = segment.get("end_index", 0)
+                seg_text = segment.get("text", "")
 
-                # セグメントがこのパートと重なるか確認（部分的な重なりもOK）
-                if seg_start < part_info["end"] and seg_end > part_info["start"]:
+                # セグメントのテキストがこのパートに含まれるか確認
+                if seg_text and len(seg_text) > self.MIN_SEGMENT_TEXT_LENGTH and seg_text in part_text:
                     for idx in support.get("chunk_indices", []):
                         if idx < len(chunks):
                             source_indices.add(idx)
 
-            # ソースリンクを追加
+            # ソースリンクを追加（URIで重複排除）
             if source_indices:
+                seen_uris = set()
                 source_links = []
                 for idx in sorted(source_indices):
-                    link = self._format_source_link(chunks[idx])
+                    chunk = chunks[idx]
+                    uri = chunk.get("uri", "")
+                    if not uri or uri in seen_uris:
+                        continue
+                    seen_uris.add(uri)
+                    link = self._format_source_link(chunk)
                     if link:
                         source_links.append(link)
                 if source_links:
