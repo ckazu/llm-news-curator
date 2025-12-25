@@ -1,0 +1,40 @@
+name: Daily News Curator
+
+on:
+  schedule:
+    # Run at 13:00 JST (04:00 UTC)
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  curate-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+      - name: Run news curator
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_LOCATION: ${{ vars.GCP_LOCATION || 'asia-northeast1' }}
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'gemini-2.5-pro' }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          CURATOR_TOPIC: ${{ vars.CURATOR_TOPIC }}
+          SLACK_HEADER: ${{ vars.SLACK_HEADER }}
+        run: uv run python -m src.main

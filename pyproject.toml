@@ -1,0 +1,10 @@
+[project]
+name = "llm-news-curator"
+version = "0.1.0"
+description = "Vertex AI + Google Search grounding で任意のテーマのニュースを収集し Slack に投稿"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.56.0",
+    "python-dotenv>=1.2.1",
+    "slack-sdk>=3.39.0",
+]
