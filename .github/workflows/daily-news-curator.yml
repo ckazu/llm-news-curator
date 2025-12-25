@@ -2,8 +2,8 @@ name: Daily News Curator
 
 on:
   schedule:
-    # Run at 9:00 AM JST (00:00 UTC)
-    - cron: '0 0 * * *'
+    # Run at 13:00 JST (04:00 UTC)
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:

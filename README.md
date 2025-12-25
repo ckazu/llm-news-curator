@@ -107,7 +107,7 @@ CURATOR_TOPIC=スタートアップ 資金調達
 ## アーキテクチャ
 
 ```
-GitHub Actions (毎日 9:00 JST)
+GitHub Actions (毎日 13:00 JST)
     │
     ▼
 Python Script
