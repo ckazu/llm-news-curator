@@ -157,11 +157,16 @@ class NewsCurator:
 
     def _format_source_link(self, chunk: dict) -> str:
         """Format a single source link for Slack mrkdwn."""
-        title = chunk.get("title", "リンク")
-        uri = chunk.get("uri", "")
-        if uri:
-            return f"<{uri}|{title}>"
-        return ""
+        title = chunk.get("title")
+        uri = chunk.get("uri")
+        if not uri:
+            if title:
+                logger.warning(
+                    "Grounding chunk has title but no URI; omitting source link: %s",
+                    chunk,
+                )
+            return ""
+        return f"<{uri}|{title or 'リンク'}>"
 
     def _append_all_sources(self, text: str, chunks: list[dict]) -> str:
         """Append all sources at the end of the text."""
