@@ -50,6 +50,8 @@ PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュー�
 class NewsCurator:
     """Curates news using Vertex AI with Google Search grounding."""
 
+    SEPARATOR = "───────────────────"
+
     def __init__(self, config: Config):
         self.config = config
         self.client = genai.Client(
@@ -97,8 +99,7 @@ class NewsCurator:
             logger.debug("No chunks or supports available, returning original text")
             return text
 
-        separator = "───────────────────"
-        parts = text.split(separator)
+        parts = text.split(self.SEPARATOR)
 
         if len(parts) <= 1:
             # 区切り線がない場合は最後に全ソースを追加
@@ -113,7 +114,7 @@ class NewsCurator:
                 "end": current_pos + len(part),
                 "text": part,
             })
-            current_pos += len(part) + len(separator)
+            current_pos += len(part) + len(self.SEPARATOR)
 
         # 各パートに対応するソースを特定
         result_parts = []
@@ -141,29 +142,34 @@ class NewsCurator:
 
             # ソースリンクを追加
             if source_indices:
-                sources_text = "\n:link: 参照元: "
                 source_links = []
                 for idx in sorted(source_indices):
-                    chunk = chunks[idx]
-                    title = chunk.get("title", "リンク")
-                    uri = chunk.get("uri", "")
-                    if uri:
-                        source_links.append(f"<{uri}|{title}>")
-                sources_text += " | ".join(source_links)
-                part_text = part_text.rstrip() + sources_text + "\n"
+                    link = self._format_source_link(chunks[idx])
+                    if link:
+                        source_links.append(link)
+                if source_links:
+                    sources_text = "\n:link: 参照元: " + " | ".join(source_links)
+                    part_text = part_text.rstrip() + sources_text + "\n"
 
             result_parts.append(part_text)
 
-        return separator.join(result_parts)
+        return self.SEPARATOR.join(result_parts)
+
+    def _format_source_link(self, chunk: dict) -> str:
+        """Format a single source link for Slack mrkdwn."""
+        title = chunk.get("title", "リンク")
+        uri = chunk.get("uri", "")
+        if uri:
+            return f"<{uri}|{title}>"
+        return ""
 
     def _append_all_sources(self, text: str, chunks: list[dict]) -> str:
         """Append all sources at the end of the text."""
-        text += "\n───────────────────\n\n:link: *参照元*\n"
+        text += f"\n{self.SEPARATOR}\n\n:link: *参照元*\n"
         for chunk in chunks:
-            title = chunk.get("title", "リンク")
-            uri = chunk.get("uri", "")
-            if uri:
-                text += f"• <{uri}|{title}>\n"
+            link = self._format_source_link(chunk)
+            if link:
+                text += f"• {link}\n"
         return text
 
     def _extract_grounding_metadata(self, response) -> tuple[list[dict], list[dict]]:
