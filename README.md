@@ -11,11 +11,13 @@ Vertex AI (Gemini 2.5 Pro) と Google Search グラウンディングを使用�
 
 ## セットアップ
 
-### 1. Google Cloud セットアップ（Workload Identity Federation）
-
-秘密鍵を使わない安全な認証方式です。
+### 1. Google Cloud セットアップ
 
 ```bash
+# 0. gcloud 認証とプロジェクト設定
+gcloud auth login
+gcloud config set project PROJECT_ID
+
 # 1. サービスアカウント作成
 gcloud iam service-accounts create llm-news-curator \
   --display-name="LLM News Curator"
@@ -25,34 +27,12 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="serviceAccount:llm-news-curator@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/aiplatform.user"
 
-# 3. Workload Identity Pool 作成
-gcloud iam workload-identity-pools create "github-pool" \
-  --location="global" \
-  --display-name="GitHub Actions Pool"
-
-# 4. OIDC Provider 追加
-gcloud iam workload-identity-pools providers create-oidc "github-provider" \
-  --location="global" \
-  --workload-identity-pool="github-pool" \
-  --display-name="GitHub Provider" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
-  --attribute-condition="assertion.repository_owner == 'YOUR_GITHUB_USERNAME'" \
-  --issuer-uri="https://token.actions.githubusercontent.com"
-
-# 5. サービスアカウントに WIF 権限付与
-gcloud iam service-accounts add-iam-policy-binding \
-  "llm-news-curator@PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/YOUR_GITHUB_USERNAME/llm-news-curator"
-
-# 6. プロバイダー名を取得（GitHub Secrets に設定）
-gcloud iam workload-identity-pools providers describe "github-provider" \
-  --location="global" \
-  --workload-identity-pool="github-pool" \
-  --format="value(name)"
+# 3. サービスアカウントキーを作成（GitHub Actions 用）
+gcloud iam service-accounts keys create credentials.json \
+  --iam-account=llm-news-curator@PROJECT_ID.iam.gserviceaccount.com
 ```
 
-**注意**: `PROJECT_ID`, `PROJECT_NUMBER`, `YOUR_GITHUB_USERNAME` を実際の値に置き換えてください。
+**注意**: `PROJECT_ID` を実際のプロジェクトIDに置き換えてください。
 
 ### 2. Slack セットアップ
 
@@ -71,9 +51,8 @@ gcloud iam workload-identity-pools providers describe "github-provider" \
 
 | 名前 | 説明 |
 |------|------|
+| `GCP_CREDENTIALS_JSON` | サービスアカウントキー JSON の内容をそのまま貼り付け |
 | `GCP_PROJECT_ID` | GCP プロジェクト ID |
-| `GCP_SERVICE_ACCOUNT` | サービスアカウントメール（例: `llm-news-curator@PROJECT_ID.iam.gserviceaccount.com`） |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | 手順6で取得したプロバイダー名 |
 | `SLACK_BOT_TOKEN` | Slack Bot User OAuth Token (`xoxb-...`) |
 | `SLACK_CHANNEL_ID` | 投稿先チャンネル ID (`C0XXXXXXX`) |
 
