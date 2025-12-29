@@ -42,8 +42,13 @@ PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュー�
 - Markdown の ## や ** は使わず、Slack mrkdwn の *太字* を使用
 - 過去24時間以内のニュースのみ対象
 - 情報がない場合は「該当するニュースは見つからなかったのだ」と報告
-- 最低でも3件以上のニュースを報告するよう努めること
+- ニュースは3〜5件報告すること（最低3件、最大5件）
 - すべての説明文でずんだもん口調を維持すること
+{exclude_section}"""
+
+EXCLUDE_SECTION_TEMPLATE = """
+# 既報のため除外するニュース（以下と同じ内容は報告しないこと）
+{titles}
 """
 
 
@@ -71,13 +76,24 @@ class NewsCurator:
             location=config.gcp_location,
         )
 
-    def fetch_news(self) -> list[NewsItem]:
+    def fetch_news(self, exclude_titles: list[str] | None = None) -> list[NewsItem]:
         """Fetch news using Google Search grounding.
+
+        Args:
+            exclude_titles: List of news titles to exclude (already reported).
 
         Returns:
             List of NewsItem objects with text and sources.
         """
-        prompt = PROMPT_TEMPLATE.format(topic=self.config.curator_topic)
+        exclude_section = ""
+        if exclude_titles:
+            titles_text = "\n".join(f"- {title}" for title in exclude_titles)
+            exclude_section = EXCLUDE_SECTION_TEMPLATE.format(titles=titles_text)
+
+        prompt = PROMPT_TEMPLATE.format(
+            topic=self.config.curator_topic,
+            exclude_section=exclude_section,
+        )
 
         logger.info(f"Fetching news for topic: {self.config.curator_topic}")
         logger.info(f"Using model: {self.config.model_name}")

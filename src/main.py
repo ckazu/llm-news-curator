@@ -25,15 +25,20 @@ def main() -> int:
         logger.info("Configuration loaded successfully")
         logger.info(f"Topic: {config.curator_topic}")
 
+        poster = SlackPoster(config)
+
+        # 過去の投稿からタイトルを取得して重複を避ける
+        logger.info("Fetching recent titles from Slack...")
+        exclude_titles = poster.fetch_recent_titles()
+
         curator = NewsCurator(config)
         logger.info("Fetching news with Google Search grounding...")
-        items = curator.fetch_news()
+        items = curator.fetch_news(exclude_titles=exclude_titles)
         logger.info(f"Received {len(items)} news items")
         for i, item in enumerate(items):
             logger.debug(f"Item {i + 1}: {item.text[:100]}...")
             logger.debug(f"  Sources: {len(item.sources)}, Impression: {item.is_impression}")
 
-        poster = SlackPoster(config)
         logger.info("Posting to Slack...")
         success = poster.post_news(items)
 

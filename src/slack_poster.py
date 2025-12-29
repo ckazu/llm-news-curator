@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from slack_sdk import WebClient
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_BLOCK_TEXT_LENGTH = 3000
+HISTORY_DAYS = 3
 
 
 class SlackPoster:
@@ -121,3 +123,39 @@ class SlackPoster:
             if uri:
                 links.append(f"<{uri}|{title}>")
         return " | ".join(links)
+
+    def fetch_recent_titles(self) -> list[str]:
+        """Fetch news titles from recent messages in the channel.
+
+        Returns:
+            List of news titles from the past HISTORY_DAYS days.
+        """
+        oldest = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS)
+        oldest_ts = str(oldest.timestamp())
+
+        try:
+            response = self.client.conversations_history(
+                channel=self.channel_id,
+                oldest=oldest_ts,
+                limit=100,
+            )
+
+            titles = []
+            # タイトルパターン: :one: *タイトル名* や :two: *タイトル名* など
+            title_pattern = re.compile(r":[a-zA-Z0-9_]+:\s*\*([^*]+)\*")
+
+            for message in response.get("messages", []):
+                blocks = message.get("blocks", [])
+                for block in blocks:
+                    if block.get("type") == "section":
+                        text = block.get("text", {}).get("text", "")
+                        matches = title_pattern.findall(text)
+                        titles.extend(matches)
+
+            logger.info(f"Found {len(titles)} titles from past {HISTORY_DAYS} days")
+            logger.debug(f"Recent titles: {titles}")
+            return titles
+
+        except SlackApiError as e:
+            logger.warning(f"Failed to fetch conversation history: {e.response['error']}")
+            return []
