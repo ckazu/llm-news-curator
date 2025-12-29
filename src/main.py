@@ -23,31 +23,37 @@ def main() -> int:
     try:
         config = Config.from_env()
         logger.info("Configuration loaded successfully")
-        logger.info(f"Topic: {config.curator_topic}")
-
-        poster = SlackPoster(config)
-
-        # 過去の投稿からタイトルを取得して重複を避ける
-        logger.info("Fetching recent titles from Slack...")
-        exclude_titles = poster.fetch_recent_titles()
+        logger.info(f"Found {len(config.topics)} topic(s) to process")
 
         curator = NewsCurator(config)
-        logger.info("Fetching news with Google Search grounding...")
-        items = curator.fetch_news(exclude_titles=exclude_titles)
-        logger.info(f"Received {len(items)} news items")
-        for i, item in enumerate(items):
-            logger.debug(f"Item {i + 1}: {item.text[:100]}...")
-            logger.debug(f"  Sources: {len(item.sources)}, Impression: {item.is_impression}")
+        all_success = True
 
-        logger.info("Posting to Slack...")
-        success = poster.post_news(items)
+        for topic in config.topics:
+            logger.info(f"Processing topic: {topic.name}")
 
-        if success:
-            logger.info("News posted successfully")
-            return 0
-        else:
-            logger.error("Failed to post news to Slack")
-            return 1
+            poster = SlackPoster(config, topic)
+
+            # 過去の投稿からタイトルを取得して重複を避ける
+            logger.info("Fetching recent titles from Slack...")
+            exclude_titles = poster.fetch_recent_titles()
+
+            logger.info("Fetching news with Google Search grounding...")
+            items = curator.fetch_news(topic.name, exclude_titles=exclude_titles)
+            logger.info(f"Received {len(items)} news items")
+            for i, item in enumerate(items):
+                logger.debug(f"Item {i + 1}: {item.text[:100]}...")
+                logger.debug(f"  Sources: {len(item.sources)}, Impression: {item.is_impression}")
+
+            logger.info("Posting to Slack...")
+            success = poster.post_news(items)
+
+            if success:
+                logger.info(f"News posted successfully for topic: {topic.name}")
+            else:
+                logger.error(f"Failed to post news for topic: {topic.name}")
+                all_success = False
+
+        return 0 if all_success else 1
 
     except KeyError as e:
         logger.error(f"Missing required environment variable: {e}")

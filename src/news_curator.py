@@ -3,7 +3,7 @@ import logging
 from google import genai
 from google.genai import types
 
-from .config import Config
+from .config import Config, TopicConfig
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +76,13 @@ class NewsCurator:
             location=config.gcp_location,
         )
 
-    def fetch_news(self, exclude_titles: list[str] | None = None) -> list[NewsItem]:
+    def fetch_news(
+        self, topic: str, exclude_titles: list[str] | None = None
+    ) -> list[NewsItem]:
         """Fetch news using Google Search grounding.
 
         Args:
+            topic: The topic to search for news.
             exclude_titles: List of news titles to exclude (already reported).
 
         Returns:
@@ -91,11 +94,11 @@ class NewsCurator:
             exclude_section = EXCLUDE_SECTION_TEMPLATE.format(titles=titles_text)
 
         prompt = PROMPT_TEMPLATE.format(
-            topic=self.config.curator_topic,
+            topic=topic,
             exclude_section=exclude_section,
         )
 
-        logger.info(f"Fetching news for topic: {self.config.curator_topic}")
+        logger.info(f"Fetching news for topic: {topic}")
         logger.info(f"Using model: {self.config.model_name}")
 
         response = self.client.models.generate_content(

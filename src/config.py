@@ -1,5 +1,29 @@
+import json
 import os
 from dataclasses import dataclass
+
+
+@dataclass
+class TopicConfig:
+    """Configuration for a single topic."""
+
+    name: str
+    channel_id: str
+    header: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TopicConfig":
+        """Create TopicConfig from a dictionary."""
+        name = data.get("name", "")
+        if not name:
+            raise ValueError("Topic 'name' is required")
+
+        channel_id = data.get("channel_id", "")
+        if not channel_id:
+            raise ValueError("Topic 'channel_id' is required")
+
+        header = data.get("header", f"{name} ニュース")
+        return cls(name=name, channel_id=channel_id, header=header)
 
 
 @dataclass
@@ -13,29 +37,54 @@ class Config:
 
     # Slack settings
     slack_bot_token: str
-    slack_channel_id: str
 
-    # Curator settings
-    curator_topic: str
-    slack_header: str
+    # Topics
+    topics: list[TopicConfig]
 
     @classmethod
     def from_env(cls) -> "Config":
-        """Load configuration from environment variables."""
-        topic = os.environ.get("CURATOR_TOPIC", "")
-        if not topic:
-            raise ValueError("CURATOR_TOPIC environment variable is required")
+        """Load configuration from environment variables.
 
-        slack_header = os.environ.get("SLACK_HEADER", "")
-        if not slack_header:
-            slack_header = f"{topic} ニュース"
+        Supports two modes:
+        1. Multi-topic mode: TOPICS_CONFIG env var with JSON array
+        2. Single-topic mode (legacy): CURATOR_TOPIC, SLACK_CHANNEL_ID, SLACK_HEADER
+        """
+        topics = cls._load_topics()
 
         return cls(
             gcp_project_id=os.environ["GCP_PROJECT_ID"],
             gcp_location=os.environ.get("GCP_LOCATION", "asia-northeast1"),
             model_name=os.environ.get("MODEL_NAME", "gemini-2.5-pro"),
             slack_bot_token=os.environ["SLACK_BOT_TOKEN"],
-            slack_channel_id=os.environ["SLACK_CHANNEL_ID"],
-            curator_topic=topic,
-            slack_header=slack_header,
+            topics=topics,
         )
+
+    @classmethod
+    def _load_topics(cls) -> list[TopicConfig]:
+        """Load topics from TOPICS_CONFIG or legacy env vars."""
+        topics_json = os.environ.get("TOPICS_CONFIG", "")
+
+        if topics_json:
+            # Multi-topic mode
+            try:
+                topics_data = json.loads(topics_json)
+                if not isinstance(topics_data, list):
+                    raise ValueError("TOPICS_CONFIG must be a JSON array")
+                return [TopicConfig.from_dict(t) for t in topics_data]
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid TOPICS_CONFIG JSON: {e}")
+
+        # Legacy single-topic mode
+        topic = os.environ.get("CURATOR_TOPIC", "")
+        if not topic:
+            raise ValueError(
+                "Either TOPICS_CONFIG or CURATOR_TOPIC environment variable is required"
+            )
+
+        channel_id = os.environ.get("SLACK_CHANNEL_ID", "")
+        if not channel_id:
+            raise ValueError("SLACK_CHANNEL_ID environment variable is required")
+
+        header = os.environ.get("SLACK_HEADER", f"{topic} ニュース")
+
+        return [TopicConfig(name=topic, channel_id=channel_id, header=header)]
