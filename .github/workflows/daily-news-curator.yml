@@ -34,7 +34,11 @@ jobs:
           GCP_LOCATION: ${{ vars.GCP_LOCATION || 'asia-northeast1' }}
           MODEL_NAME: ${{ vars.MODEL_NAME || 'gemini-2.5-pro' }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          # Multi-topic configuration (JSON array)
+          # Example: [{"name": "生成AI", "channel_id": "C123...", "header": "🤖 生成AI ニュース"}]
+          TOPICS_CONFIG: ${{ vars.TOPICS_CONFIG }}
+          # Legacy single-topic mode (used if TOPICS_CONFIG is not set)
           CURATOR_TOPIC: ${{ vars.CURATOR_TOPIC }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
           SLACK_HEADER: ${{ vars.SLACK_HEADER }}
         run: uv run python -m src.main

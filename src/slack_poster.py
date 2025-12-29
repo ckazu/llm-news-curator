@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from .config import Config
+from .config import Config, TopicConfig
 
 if TYPE_CHECKING:
     from .news_curator import NewsItem
@@ -20,10 +20,10 @@ HISTORY_DAYS = 3
 class SlackPoster:
     """Posts messages to Slack using Block Kit."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, topic: TopicConfig):
         self.client = WebClient(token=config.slack_bot_token)
-        self.channel_id = config.slack_channel_id
-        self.header = config.slack_header
+        self.channel_id = topic.channel_id
+        self.header = topic.header
         self.model_name = config.model_name
 
     def post_news(self, items: list["NewsItem"]) -> bool:
