@@ -142,7 +142,7 @@ class SlackPoster:
 
             titles = []
             # タイトルパターン: :one: *タイトル名* や :two: *タイトル名* など
-            title_pattern = re.compile(r":[a-z_]+:\s*\*([^*]+)\*")
+            title_pattern = re.compile(r":[a-zA-Z0-9_]+:\s*\*([^*]+)\*")
 
             for message in response.get("messages", []):
                 blocks = message.get("blocks", [])
