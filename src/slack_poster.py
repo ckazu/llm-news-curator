@@ -42,6 +42,8 @@ class SlackPoster:
                 channel=self.channel_id,
                 blocks=blocks,
                 text=self.header,
+                unfurl_links=True,
+                unfurl_media=True,
             )
             logger.info(f"Message posted successfully: {response['ts']}")
             return True
