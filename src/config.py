@@ -22,7 +22,7 @@ class TopicConfig:
         if not channel_id:
             raise ValueError("Topic 'channel_id' is required")
 
-        header = data.get("header", f"{name} ニュース")
+        header = data.get("header") or f"{name} ニュース"
         return cls(name=name, channel_id=channel_id, header=header)
 
 
@@ -85,6 +85,6 @@ class Config:
         if not channel_id:
             raise ValueError("SLACK_CHANNEL_ID environment variable is required")
 
-        header = os.environ.get("SLACK_HEADER", f"{topic} ニュース")
+        header = os.environ.get("SLACK_HEADER") or f"{topic} ニュース"
 
         return [TopicConfig(name=topic, channel_id=channel_id, header=header)]
