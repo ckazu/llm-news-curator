@@ -41,6 +41,9 @@ class Config:
     # Topics
     topics: list[TopicConfig]
 
+    # Display settings
+    use_emoji_names: bool
+
     @classmethod
     def from_env(cls) -> "Config":
         """Load configuration from environment variables.
@@ -57,6 +60,7 @@ class Config:
             model_name=os.environ.get("MODEL_NAME", "gemini-2.5-pro"),
             slack_bot_token=os.environ["SLACK_BOT_TOKEN"],
             topics=topics,
+            use_emoji_names=os.environ.get("USE_EMOJI_NAMES", "").lower() == "true",
         )
 
     @classmethod
