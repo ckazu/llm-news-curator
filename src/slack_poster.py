@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_BLOCK_TEXT_LENGTH = 3000
-HISTORY_DAYS = 3
+HISTORY_DAYS = 7
 
 
 class SlackPoster:
@@ -139,11 +139,11 @@ class SlackPoster:
                 links.append(f"<{uri}|{title}>")
         return " · ".join(links)
 
-    def fetch_recent_titles(self) -> list[str]:
-        """Fetch news titles from recent messages in the channel.
+    def fetch_recent_urls(self) -> list[str]:
+        """Fetch news URLs from recent messages in the channel.
 
         Returns:
-            List of news titles from the past HISTORY_DAYS days.
+            List of news URLs from the past HISTORY_DAYS days.
         """
         oldest = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS)
         oldest_ts = str(oldest.timestamp())
@@ -155,22 +155,26 @@ class SlackPoster:
                 limit=100,
             )
 
-            titles = []
-            # タイトルパターン: 行頭の *タイトル名* （番号付き/なし両対応）
-            # 例: "*タイトル名*" or ":one: *タイトル名*" or "*1. タイトル名*"
-            title_pattern = re.compile(r"(?:^|\n)(?::[a-zA-Z0-9_]+:\s*|\*\d+\.\s*)?\*([^*\n]+)\*")
+            urls = []
+            # URLパターン: Slack mrkdwn形式 <URL|タイトル> から URL を抽出
+            url_pattern = re.compile(r"<(https?://[^|>]+)(?:\|[^>]*)?>")
 
             for message in response.get("messages", []):
                 blocks = message.get("blocks", [])
                 for block in blocks:
-                    if block.get("type") == "section":
-                        text = block.get("text", {}).get("text", "")
-                        matches = title_pattern.findall(text)
-                        titles.extend(matches)
+                    # context ブロックの 🔗 セクションから URL を抽出
+                    if block.get("type") == "context":
+                        elements = block.get("elements", [])
+                        for element in elements:
+                            if element.get("type") == "mrkdwn":
+                                text = element.get("text", "")
+                                if text.startswith("🔗"):
+                                    matches = url_pattern.findall(text)
+                                    urls.extend(matches)
 
-            logger.info(f"Found {len(titles)} titles from past {HISTORY_DAYS} days")
-            logger.debug(f"Recent titles: {titles}")
-            return titles
+            logger.info(f"Found {len(urls)} URLs from past {HISTORY_DAYS} days")
+            logger.debug(f"Recent URLs: {urls}")
+            return urls
 
         except SlackApiError as e:
             logger.warning(f"Failed to fetch conversation history: {e.response['error']}")
