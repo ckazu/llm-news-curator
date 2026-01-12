@@ -33,12 +33,12 @@ def main() -> int:
 
             poster = SlackPoster(config, topic)
 
-            # 過去の投稿からタイトルを取得して重複を避ける
-            logger.info("Fetching recent titles from Slack...")
-            exclude_titles = poster.fetch_recent_titles()
+            # 過去の投稿からURLを取得して重複を避ける
+            logger.info("Fetching recent URLs from Slack...")
+            exclude_urls = poster.fetch_recent_urls()
 
             logger.info("Fetching news with Google Search grounding...")
-            items = curator.fetch_news(topic.name, exclude_titles=exclude_titles)
+            items = curator.fetch_news(topic.name, exclude_urls=exclude_urls)
             logger.info(f"Received {len(items)} news items")
             for i, item in enumerate(items):
                 logger.debug(f"Item {i + 1}: {item.text[:100]}...")

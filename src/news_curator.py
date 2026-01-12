@@ -72,8 +72,8 @@ PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュー�
 {exclude_section}"""
 
 EXCLUDE_SECTION_TEMPLATE = """
-# 既報のため除外するニュース（以下と同じ内容は報告しないこと）
-{titles}
+# 既報のため除外するニュース（以下と同一のURLの記事は報告しないこと）
+{urls}
 """
 
 
@@ -102,21 +102,21 @@ class NewsCurator:
         )
 
     def fetch_news(
-        self, topic: str, exclude_titles: list[str] | None = None
+        self, topic: str, exclude_urls: list[str] | None = None
     ) -> list[NewsItem]:
         """Fetch news using Google Search grounding.
 
         Args:
             topic: The topic to search for news.
-            exclude_titles: List of news titles to exclude (already reported).
+            exclude_urls: List of news URLs to exclude (already reported).
 
         Returns:
             List of NewsItem objects with text and sources.
         """
         exclude_section = ""
-        if exclude_titles:
-            titles_text = "\n".join(f"- {title}" for title in exclude_titles)
-            exclude_section = EXCLUDE_SECTION_TEMPLATE.format(titles=titles_text)
+        if exclude_urls:
+            urls_text = "\n".join(f"- {url}" for url in exclude_urls)
+            exclude_section = EXCLUDE_SECTION_TEMPLATE.format(urls=urls_text)
 
         # キャラクター名の表示形式を設定に基づいて決定
         if self.config.use_emoji_names:
