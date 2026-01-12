@@ -44,6 +44,11 @@ class Config:
     # Display settings
     use_emoji_names: bool
 
+    # Manga generation settings
+    generate_manga: bool
+    image_model_name: str
+    image_gcp_location: str
+
     @classmethod
     def from_env(cls) -> "Config":
         """Load configuration from environment variables.
@@ -61,6 +66,13 @@ class Config:
             slack_bot_token=os.environ["SLACK_BOT_TOKEN"],
             topics=topics,
             use_emoji_names=os.environ.get("USE_EMOJI_NAMES", "").lower() == "true",
+            generate_manga=os.environ.get("GENERATE_MANGA", "").lower() == "true",
+            image_model_name=os.environ.get(
+                "IMAGE_MODEL_NAME", "gemini-2.0-flash-preview-image-generation"
+            ),
+            image_gcp_location=os.environ.get(
+                "IMAGE_GCP_LOCATION", os.environ.get("GCP_LOCATION", "us-central1")
+            ),
         )
 
     @classmethod

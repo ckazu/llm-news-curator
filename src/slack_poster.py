@@ -26,11 +26,12 @@ class SlackPoster:
         self.header = topic.header
         self.model_name = config.model_name
 
-    def post_news(self, items: list["NewsItem"]) -> bool:
+    def post_news(self, items: list["NewsItem"], manga_image: bytes | None = None) -> bool:
         """Post news items to Slack using Block Kit.
 
         Args:
             items: List of NewsItem objects with text and sources.
+            manga_image: Optional PNG image bytes for 4-panel manga.
 
         Returns:
             True if successful, False otherwise.
@@ -46,9 +47,42 @@ class SlackPoster:
                 unfurl_media=False,
             )
             logger.info(f"Message posted successfully: {response['ts']}")
+
+            # Upload manga image as a reply in thread
+            if manga_image:
+                self._upload_manga_image(manga_image, response["ts"])
+
             return True
         except SlackApiError as e:
             logger.error(f"Slack API error: {e.response['error']}")
+            return False
+
+    def _upload_manga_image(self, image_bytes: bytes, thread_ts: str) -> bool:
+        """Upload manga image as a thread reply.
+
+        Args:
+            image_bytes: PNG image data.
+            thread_ts: Parent message timestamp for threading.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        try:
+            now = datetime.now(timezone.utc)
+            filename = f"manga_{now.strftime('%Y%m%d_%H%M%S')}.png"
+
+            response = self.client.files_upload_v2(
+                channel=self.channel_id,
+                file=image_bytes,
+                filename=filename,
+                title="今日のニュース4コマ",
+                initial_comment="📰 今日のニュースを4コマ漫画にしてみたのだ！",
+                thread_ts=thread_ts,
+            )
+            logger.info(f"Manga image uploaded successfully: {filename}")
+            return True
+        except SlackApiError as e:
+            logger.error(f"Failed to upload manga image: {e.response['error']}")
             return False
 
     def _build_blocks(self, items: list["NewsItem"]) -> list[dict]:

@@ -5,6 +5,7 @@ import sys
 from dotenv import load_dotenv
 
 from .config import Config
+from .image_generator import ImageGenerator
 from .news_curator import NewsCurator
 from .slack_poster import SlackPoster
 
@@ -26,6 +27,7 @@ def main() -> int:
         logger.info(f"Found {len(config.topics)} topic(s) to process")
 
         curator = NewsCurator(config)
+        image_generator = ImageGenerator(config) if config.generate_manga else None
         all_success = True
 
         for topic in config.topics:
@@ -44,8 +46,23 @@ def main() -> int:
                 logger.debug(f"Item {i + 1}: {item.text[:100]}...")
                 logger.debug(f"  Sources: {len(item.sources)}, Impression: {item.is_impression}")
 
+            # Generate 4-panel manga if enabled
+            manga_image = None
+            if image_generator and items:
+                # Find the summary section (last item with is_impression=True)
+                summary_item = next(
+                    (item for item in reversed(items) if item.is_impression), None
+                )
+                if summary_item:
+                    logger.info("Generating 4-panel manga...")
+                    manga_image = image_generator.generate_manga(summary_item.text)
+                    if manga_image:
+                        logger.info("Manga generated successfully")
+                    else:
+                        logger.warning("Failed to generate manga, continuing without it")
+
             logger.info("Posting to Slack...")
-            success = poster.post_news(items)
+            success = poster.post_news(items, manga_image=manga_image)
 
             if success:
                 logger.info(f"News posted successfully for topic: {topic.name}")
