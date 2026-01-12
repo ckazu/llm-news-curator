@@ -41,4 +41,6 @@ jobs:
           CURATOR_TOPIC: ${{ vars.CURATOR_TOPIC }}
           SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
           SLACK_HEADER: ${{ vars.SLACK_HEADER }}
+          # Display settings
+          USE_EMOJI_NAMES: ${{ vars.USE_EMOJI_NAMES || 'false' }}
         run: uv run python -m src.main
