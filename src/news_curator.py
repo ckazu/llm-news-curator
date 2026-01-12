@@ -72,7 +72,7 @@ PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュー�
 {exclude_section}"""
 
 EXCLUDE_SECTION_TEMPLATE = """
-# 既報のため除外するニュース（以下のURLと同じソースは報告しないこと）
+# 既報のため除外するニュース（以下と同一のURLの記事は報告しないこと）
 {urls}
 """
 
