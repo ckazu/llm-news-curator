@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_BLOCK_TEXT_LENGTH = 3000
+MAX_HEADER_LENGTH = 150
 HISTORY_DAYS = 7
 
 
@@ -57,13 +58,19 @@ class SlackPoster:
         date_str = now.strftime("%Y年%-m月%-d日")
         time_str = now.strftime("%H:%M UTC")
 
+        # Header は 150 文字以下に制限
+        header_text = self.header
+        if len(header_text) > MAX_HEADER_LENGTH:
+            header_text = header_text[: MAX_HEADER_LENGTH - 3] + "..."
+            logger.warning(f"Truncated header to {MAX_HEADER_LENGTH} characters")
+
         blocks = [
             # ヘッダー
             {
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": self.header,
+                    "text": header_text,
                     "emoji": True,
                 },
             },
@@ -85,12 +92,18 @@ class SlackPoster:
             blocks.append({"type": "divider"})
 
             # ニュース本文（タイトル + 説明 + 補足情報）
+            # Section text は 3000 文字以下に制限
+            text = item.text
+            if len(text) > MAX_BLOCK_TEXT_LENGTH:
+                text = text[: MAX_BLOCK_TEXT_LENGTH - 3] + "..."
+                logger.warning(f"Truncated section text to {MAX_BLOCK_TEXT_LENGTH} characters")
+
             blocks.append(
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": item.text,
+                        "text": text,
                     },
                 }
             )
