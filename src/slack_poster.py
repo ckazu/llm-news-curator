@@ -92,12 +92,18 @@ class SlackPoster:
             blocks.append({"type": "divider"})
 
             # ニュース本文（タイトル + 説明 + 補足情報）
+            # Section text は 3000 文字以下に制限
+            text = item.text
+            if len(text) > MAX_BLOCK_TEXT_LENGTH:
+                text = text[: MAX_BLOCK_TEXT_LENGTH - 3] + "..."
+                logger.warning(f"Truncated section text to {MAX_BLOCK_TEXT_LENGTH} characters")
+
             blocks.append(
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": item.text,
+                        "text": text,
                     },
                 }
             )
