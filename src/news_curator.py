@@ -157,8 +157,8 @@ class NewsCurator:
         logger.info("Successfully received response from Vertex AI")
         logger.debug(f"Response candidates: {response.candidates}")
 
-        # grounding metadata から参照元を取得
-        chunks, supports = self._extract_grounding_metadata(response)
+        # grounding metadata から参照元を取得（期間内のソースのみ）
+        chunks, supports = self._extract_grounding_metadata(response, cutoff_time=date_range_start)
 
         # 各ニュース項目を構造化
         items = self._parse_news_items(response.text, chunks, supports)
@@ -237,8 +237,18 @@ class NewsCurator:
             sources.append(chunk)
         return sources
 
-    def _extract_grounding_metadata(self, response) -> tuple[list[dict], list[dict]]:
-        """Extract grounding chunks and supports from response metadata."""
+    def _extract_grounding_metadata(
+        self, response, cutoff_time: datetime | None = None
+    ) -> tuple[list[dict], list[dict]]:
+        """Extract grounding chunks and supports from response metadata.
+
+        Args:
+            response: The API response containing grounding metadata.
+            cutoff_time: Optional datetime to filter out old sources.
+
+        Returns:
+            Tuple of (chunks, supports) lists.
+        """
         chunks = []
         supports = []
         try:
@@ -250,10 +260,37 @@ class NewsCurator:
                     if hasattr(metadata, "grounding_chunks") and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
                             if hasattr(chunk, "web") and chunk.web:
-                                chunks.append({
+                                chunk_data = {
                                     "title": getattr(chunk.web, "title", ""),
                                     "uri": getattr(chunk.web, "uri", ""),
-                                })
+                                }
+                                # Try to extract date if available
+                                if hasattr(chunk.web, "date"):
+                                    chunk_data["date"] = getattr(chunk.web, "date", None)
+                                if hasattr(chunk.web, "published_date"):
+                                    chunk_data["date"] = getattr(chunk.web, "published_date", None)
+
+                                # Filter by cutoff_time if date is available
+                                if cutoff_time and chunk_data.get("date"):
+                                    try:
+                                        chunk_date = chunk_data["date"]
+                                        if isinstance(chunk_date, str):
+                                            # Try to parse common date formats
+                                            for fmt in ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"]:
+                                                try:
+                                                    chunk_date = datetime.strptime(chunk_date, fmt)
+                                                    if chunk_date.tzinfo is None:
+                                                        chunk_date = chunk_date.replace(tzinfo=timezone.utc)
+                                                    break
+                                                except ValueError:
+                                                    continue
+                                        if isinstance(chunk_date, datetime) and chunk_date < cutoff_time:
+                                            logger.debug(f"Filtering old source: {chunk_data['uri']} (date: {chunk_date})")
+                                            continue
+                                    except Exception as e:
+                                        logger.debug(f"Could not parse date for filtering: {e}")
+
+                                chunks.append(chunk_data)
 
                     # Extract grounding supports
                     if hasattr(metadata, "grounding_supports") and metadata.grounding_supports:
