@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from google import genai
 from google.genai import types
@@ -7,7 +8,7 @@ from .config import Config, TopicConfig
 
 logger = logging.getLogger(__name__)
 
-PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
+PROMPT_TEMPLATE = """本日は {current_date} です。「{topic}」に関する過去24時間以内（{date_range_start} 以降）のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
 
 # ずんだもんの設定
 - ずんだ餅の妖精
@@ -126,11 +127,19 @@ class NewsCurator:
             zundamon = "ずんだもん"
             ankomon = "あんこもん"
 
+        # 現在の日時と24時間前の日時を計算
+        now = datetime.now(timezone.utc)
+        date_range_start = now - timedelta(hours=24)
+        current_date = now.strftime("%Y年%m月%d日 %H:%M UTC")
+        date_range_start_str = date_range_start.strftime("%Y年%m月%d日 %H:%M UTC")
+
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
             exclude_section=exclude_section,
             zundamon=zundamon,
             ankomon=ankomon,
+            current_date=current_date,
+            date_range_start=date_range_start_str,
         )
 
         logger.info(f"Fetching news for topic: {topic}")
