@@ -8,7 +8,7 @@ from .config import Config, TopicConfig
 
 logger = logging.getLogger(__name__)
 
-PROMPT_TEMPLATE = """本日は {current_date} です。「{topic}」に関する過去24時間以内（{date_range_start} 以降）のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
+PROMPT_TEMPLATE = """本日は {current_date} です。「{topic}」に関する{time_period}（{date_range_start} 以降）のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
 
 # ずんだもんの設定
 - ずんだ餅の妖精
@@ -127,9 +127,13 @@ class NewsCurator:
             zundamon = "ずんだもん"
             ankomon = "あんこもん"
 
-        # 現在の日時と24時間前の日時を計算
+        # 現在の日時と検索期間の開始日時を計算
+        # 月曜日は土日の分も含めて72時間、それ以外は24時間
         now = datetime.now(timezone.utc)
-        date_range_start = now - timedelta(hours=24)
+        is_monday = now.weekday() == 0
+        hours_back = 72 if is_monday else 24
+        time_period = "過去72時間以内（土日を含む）" if is_monday else "過去24時間以内"
+        date_range_start = now - timedelta(hours=hours_back)
         current_date = now.strftime("%Y年%m月%d日 %H:%M UTC")
         date_range_start_str = date_range_start.strftime("%Y年%m月%d日 %H:%M UTC")
 
@@ -139,6 +143,7 @@ class NewsCurator:
             zundamon=zundamon,
             ankomon=ankomon,
             current_date=current_date,
+            time_period=time_period,
             date_range_start=date_range_start_str,
         )
 
