@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from google import genai
 from google.genai import types
@@ -7,7 +8,7 @@ from .config import Config, TopicConfig
 
 logger = logging.getLogger(__name__)
 
-PROMPT_TEMPLATE = """「{topic}」に関する過去24時間以内のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
+PROMPT_TEMPLATE = """本日は {current_date} です。「{topic}」に関する{time_period}（{date_range_start} 以降）のニュースを検索し、「ずんだもん」と「あんこもん」の2人が議論する形式でSlack mrkdwn形式で報告してください。
 
 # ずんだもんの設定
 - ずんだ餅の妖精
@@ -126,11 +127,24 @@ class NewsCurator:
             zundamon = "ずんだもん"
             ankomon = "あんこもん"
 
+        # 現在の日時と検索期間の開始日時を計算
+        # 月曜日は土日の分も含めて72時間、それ以外は24時間
+        now = datetime.now(timezone.utc)
+        is_monday = now.weekday() == 0
+        hours_back = 72 if is_monday else 24
+        time_period = "過去72時間以内（土日を含む）" if is_monday else "過去24時間以内"
+        date_range_start = now - timedelta(hours=hours_back)
+        current_date = now.strftime("%Y年%m月%d日 %H:%M UTC")
+        date_range_start_str = date_range_start.strftime("%Y年%m月%d日 %H:%M UTC")
+
         prompt = PROMPT_TEMPLATE.format(
             topic=topic,
             exclude_section=exclude_section,
             zundamon=zundamon,
             ankomon=ankomon,
+            current_date=current_date,
+            time_period=time_period,
+            date_range_start=date_range_start_str,
         )
 
         logger.info(f"Fetching news for topic: {topic}")
@@ -148,8 +162,8 @@ class NewsCurator:
         logger.info("Successfully received response from Vertex AI")
         logger.debug(f"Response candidates: {response.candidates}")
 
-        # grounding metadata から参照元を取得
-        chunks, supports = self._extract_grounding_metadata(response)
+        # grounding metadata から参照元を取得（期間内のソースのみ）
+        chunks, supports = self._extract_grounding_metadata(response, cutoff_time=date_range_start)
 
         # 各ニュース項目を構造化
         items = self._parse_news_items(response.text, chunks, supports)
@@ -228,8 +242,18 @@ class NewsCurator:
             sources.append(chunk)
         return sources
 
-    def _extract_grounding_metadata(self, response) -> tuple[list[dict], list[dict]]:
-        """Extract grounding chunks and supports from response metadata."""
+    def _extract_grounding_metadata(
+        self, response, cutoff_time: datetime | None = None
+    ) -> tuple[list[dict], list[dict]]:
+        """Extract grounding chunks and supports from response metadata.
+
+        Args:
+            response: The API response containing grounding metadata.
+            cutoff_time: Optional datetime to filter out old sources.
+
+        Returns:
+            Tuple of (chunks, supports) lists.
+        """
         chunks = []
         supports = []
         try:
@@ -241,10 +265,37 @@ class NewsCurator:
                     if hasattr(metadata, "grounding_chunks") and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
                             if hasattr(chunk, "web") and chunk.web:
-                                chunks.append({
+                                chunk_data = {
                                     "title": getattr(chunk.web, "title", ""),
                                     "uri": getattr(chunk.web, "uri", ""),
-                                })
+                                }
+                                # Try to extract date if available
+                                if hasattr(chunk.web, "date"):
+                                    chunk_data["date"] = getattr(chunk.web, "date", None)
+                                if hasattr(chunk.web, "published_date"):
+                                    chunk_data["date"] = getattr(chunk.web, "published_date", None)
+
+                                # Filter by cutoff_time if date is available
+                                if cutoff_time and chunk_data.get("date"):
+                                    try:
+                                        chunk_date = chunk_data["date"]
+                                        if isinstance(chunk_date, str):
+                                            # Try to parse common date formats
+                                            for fmt in ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"]:
+                                                try:
+                                                    chunk_date = datetime.strptime(chunk_date, fmt)
+                                                    if chunk_date.tzinfo is None:
+                                                        chunk_date = chunk_date.replace(tzinfo=timezone.utc)
+                                                    break
+                                                except ValueError:
+                                                    continue
+                                        if isinstance(chunk_date, datetime) and chunk_date < cutoff_time:
+                                            logger.debug(f"Filtering old source: {chunk_data['uri']} (date: {chunk_date})")
+                                            continue
+                                    except Exception as e:
+                                        logger.debug(f"Could not parse date for filtering: {e}")
+
+                                chunks.append(chunk_data)
 
                     # Extract grounding supports
                     if hasattr(metadata, "grounding_supports") and metadata.grounding_supports:
