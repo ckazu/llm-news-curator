@@ -3,6 +3,15 @@ import os
 from dataclasses import dataclass
 
 
+def _parse_bool(value) -> bool:
+    """Parse a boolean value from various types."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).lower() == "true"
+
+
 @dataclass
 class TopicConfig:
     """Configuration for a single topic."""
@@ -10,6 +19,8 @@ class TopicConfig:
     name: str
     channel_id: str
     header: str
+    unfurl_links: bool = False
+    unfurl_media: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> "TopicConfig":
@@ -23,7 +34,15 @@ class TopicConfig:
             raise ValueError("Topic 'channel_id' is required")
 
         header = data.get("header") or f"{name} ニュース"
-        return cls(name=name, channel_id=channel_id, header=header)
+        unfurl_links = _parse_bool(data.get("unfurl_links", False))
+        unfurl_media = _parse_bool(data.get("unfurl_media", False))
+        return cls(
+            name=name,
+            channel_id=channel_id,
+            header=header,
+            unfurl_links=unfurl_links,
+            unfurl_media=unfurl_media,
+        )
 
 
 @dataclass
@@ -90,5 +109,15 @@ class Config:
             raise ValueError("SLACK_CHANNEL_ID environment variable is required")
 
         header = os.environ.get("SLACK_HEADER") or f"{topic} ニュース"
+        unfurl_links = _parse_bool(os.environ.get("SLACK_UNFURL_LINKS", False))
+        unfurl_media = _parse_bool(os.environ.get("SLACK_UNFURL_MEDIA", False))
 
-        return [TopicConfig(name=topic, channel_id=channel_id, header=header)]
+        return [
+            TopicConfig(
+                name=topic,
+                channel_id=channel_id,
+                header=header,
+                unfurl_links=unfurl_links,
+                unfurl_media=unfurl_media,
+            )
+        ]

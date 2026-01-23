@@ -26,6 +26,8 @@ class SlackPoster:
         self.channel_id = topic.channel_id
         self.header = topic.header
         self.model_name = config.model_name
+        self.unfurl_links = topic.unfurl_links
+        self.unfurl_media = topic.unfurl_media
 
     def post_news(self, items: list["NewsItem"]) -> bool:
         """Post news items to Slack using Block Kit.
@@ -43,8 +45,8 @@ class SlackPoster:
                 channel=self.channel_id,
                 blocks=blocks,
                 text=self.header,
-                unfurl_links=False,
-                unfurl_media=False,
+                unfurl_links=self.unfurl_links,
+                unfurl_media=self.unfurl_media,
             )
             logger.info(f"Message posted successfully: {response['ts']}")
             return True
