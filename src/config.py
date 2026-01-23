@@ -65,12 +65,7 @@ class Config:
 
     @classmethod
     def from_env(cls) -> "Config":
-        """Load configuration from environment variables.
-
-        Supports two modes:
-        1. Multi-topic mode: TOPICS_CONFIG env var with JSON array
-        2. Single-topic mode (legacy): CURATOR_TOPIC, SLACK_CHANNEL_ID, SLACK_HEADER
-        """
+        """Load configuration from environment variables."""
         topics = cls._load_topics()
 
         return cls(
@@ -84,40 +79,15 @@ class Config:
 
     @classmethod
     def _load_topics(cls) -> list[TopicConfig]:
-        """Load topics from TOPICS_CONFIG or legacy env vars."""
+        """Load topics from TOPICS_CONFIG environment variable."""
         topics_json = os.environ.get("TOPICS_CONFIG", "")
+        if not topics_json:
+            raise ValueError("TOPICS_CONFIG environment variable is required")
 
-        if topics_json:
-            # Multi-topic mode
-            try:
-                topics_data = json.loads(topics_json)
-                if not isinstance(topics_data, list):
-                    raise ValueError("TOPICS_CONFIG must be a JSON array")
-                return [TopicConfig.from_dict(t) for t in topics_data]
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid TOPICS_CONFIG JSON: {e}")
-
-        # Legacy single-topic mode
-        topic = os.environ.get("CURATOR_TOPIC", "")
-        if not topic:
-            raise ValueError(
-                "Either TOPICS_CONFIG or CURATOR_TOPIC environment variable is required"
-            )
-
-        channel_id = os.environ.get("SLACK_CHANNEL_ID", "")
-        if not channel_id:
-            raise ValueError("SLACK_CHANNEL_ID environment variable is required")
-
-        header = os.environ.get("SLACK_HEADER") or f"{topic} ニュース"
-        unfurl_links = _parse_bool(os.environ.get("SLACK_UNFURL_LINKS", False))
-        unfurl_media = _parse_bool(os.environ.get("SLACK_UNFURL_MEDIA", False))
-
-        return [
-            TopicConfig(
-                name=topic,
-                channel_id=channel_id,
-                header=header,
-                unfurl_links=unfurl_links,
-                unfurl_media=unfurl_media,
-            )
-        ]
+        try:
+            topics_data = json.loads(topics_json)
+            if not isinstance(topics_data, list):
+                raise ValueError("TOPICS_CONFIG must be a JSON array")
+            return [TopicConfig.from_dict(t) for t in topics_data]
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid TOPICS_CONFIG JSON: {e}")
