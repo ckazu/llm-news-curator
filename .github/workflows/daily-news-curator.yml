@@ -34,18 +34,10 @@ jobs:
           GCP_LOCATION: ${{ vars.GCP_LOCATION != '' && vars.GCP_LOCATION || 'asia-northeast1' }}
           MODEL_NAME: ${{ vars.MODEL_NAME != '' && vars.MODEL_NAME || 'gemini-2.5-pro' }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          # Multi-topic configuration (JSON array)
+          # Topic configuration (JSON array)
           # Example: [{"name": "生成AI", "channel_id": "C123...", "header": "🤖 生成AI ニュース", "unfurl_links": true}]
           # unfurl_links, unfurl_media can be set per topic (optional, default: false)
           TOPICS_CONFIG: ${{ vars.TOPICS_CONFIG }}
-          # Legacy single-topic mode (used if TOPICS_CONFIG is not set)
-          CURATOR_TOPIC: ${{ vars.CURATOR_TOPIC }}
-          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
-          SLACK_HEADER: ${{ vars.SLACK_HEADER }}
           # Display settings
           USE_EMOJI_NAMES: ${{ vars.USE_EMOJI_NAMES != '' && vars.USE_EMOJI_NAMES || 'false' }}
-          # Slack URL unfurl settings (for legacy single-topic mode)
-          # For multi-topic mode, set unfurl_links/unfurl_media in TOPICS_CONFIG
-          SLACK_UNFURL_LINKS: ${{ vars.SLACK_UNFURL_LINKS != '' && vars.SLACK_UNFURL_LINKS || 'false' }}
-          SLACK_UNFURL_MEDIA: ${{ vars.SLACK_UNFURL_MEDIA != '' && vars.SLACK_UNFURL_MEDIA || 'false' }}
         run: uv run python -m src.main
