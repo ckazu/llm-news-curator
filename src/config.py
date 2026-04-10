@@ -1,6 +1,7 @@
 import json
 import os
 from dataclasses import dataclass
+from enum import Enum
 
 
 def _parse_bool(value) -> bool:
@@ -12,6 +13,11 @@ def _parse_bool(value) -> bool:
     return str(value).lower() == "true"
 
 
+class NewsSource(str, Enum):
+    GOOGLE_SEARCH = "google_search"
+    X_NEWS = "x_news"
+
+
 @dataclass
 class TopicConfig:
     """Configuration for a single topic."""
@@ -19,6 +25,7 @@ class TopicConfig:
     name: str
     channel_id: str
     header: str
+    query: str
     unfurl_links: bool = False
     unfurl_media: bool = False
 
@@ -34,12 +41,14 @@ class TopicConfig:
             raise ValueError("Topic 'channel_id' is required")
 
         header = data.get("header") or f"{name} ニュース"
+        query = data.get("query") or name
         unfurl_links = _parse_bool(data.get("unfurl_links", False))
         unfurl_media = _parse_bool(data.get("unfurl_media", False))
         return cls(
             name=name,
             channel_id=channel_id,
             header=header,
+            query=query,
             unfurl_links=unfurl_links,
             unfurl_media=unfurl_media,
         )
@@ -57,6 +66,12 @@ class Config:
     # Slack settings
     slack_bot_token: str
 
+    # X API settings (optional)
+    x_bearer_token: str | None
+
+    # News source
+    news_source: NewsSource
+
     # Topics
     topics: list[TopicConfig]
 
@@ -67,15 +82,34 @@ class Config:
     def from_env(cls) -> "Config":
         """Load configuration from environment variables."""
         topics = cls._load_topics()
+        x_bearer_token = os.environ.get("X_BEARER_TOKEN") or None
+        news_source = cls._load_news_source(x_bearer_token)
 
         return cls(
             gcp_project_id=os.environ["GCP_PROJECT_ID"],
             gcp_location=os.environ.get("GCP_LOCATION", "asia-northeast1"),
             model_name=os.environ.get("MODEL_NAME", "gemini-2.5-pro"),
             slack_bot_token=os.environ["SLACK_BOT_TOKEN"],
+            x_bearer_token=x_bearer_token,
+            news_source=news_source,
             topics=topics,
             use_emoji_names=_parse_bool(os.environ.get("USE_EMOJI_NAMES", False)),
         )
+
+    @classmethod
+    def _load_news_source(cls, x_bearer_token: str | None) -> NewsSource:
+        """Load and validate NEWS_SOURCE from environment."""
+        raw = os.environ.get("NEWS_SOURCE", NewsSource.GOOGLE_SEARCH.value).strip().lower()
+        try:
+            source = NewsSource(raw)
+        except ValueError:
+            valid = ", ".join(s.value for s in NewsSource)
+            raise ValueError(f"Invalid NEWS_SOURCE={raw!r}. Valid values: {valid}")
+
+        if source == NewsSource.X_NEWS and not x_bearer_token:
+            raise ValueError("NEWS_SOURCE=x_news requires X_BEARER_TOKEN to be set")
+
+        return source
 
     @classmethod
     def _load_topics(cls) -> list[TopicConfig]:
