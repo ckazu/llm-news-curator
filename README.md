@@ -57,17 +57,17 @@ gcloud iam service-accounts keys create credentials.json \
 | `GCP_CREDENTIALS_JSON` | サービスアカウントキー JSON の内容をそのまま貼り付け |
 | `GCP_PROJECT_ID` | GCP プロジェクト ID |
 | `SLACK_BOT_TOKEN` | Slack Bot User OAuth Token (`xoxb-...`) |
-| `SLACK_CHANNEL_ID` | 投稿先チャンネル ID（単一トピックモード時のみ） |
+| `X_BEARER_TOKEN` | X News API を使う場合の Bearer Token（`NEWS_SOURCE=x_news` のとき必須） |
 
 #### Variables（設定値）
 
 | 名前 | 説明 | 例 |
 |------|------|-----|
 | `TOPICS_CONFIG` | 複数トピック設定（JSON配列） | 下記参照 |
-| `CURATOR_TOPIC` | 収集するニュースのテーマ（単一トピックモード） | `AI生成ゲーム` |
-| `SLACK_HEADER` | Slack メッセージのヘッダー（任意） | 空の場合は `{topic} ニュース` |
+| `NEWS_SOURCE` | ニュース取得元（任意） | `google_search` または `x_news` |
 | `GCP_LOCATION` | Vertex AI リージョン（任意） | `asia-northeast1` |
 | `MODEL_NAME` | 使用するモデル（任意） | `gemini-2.5-pro` |
+| `USE_EMOJI_NAMES` | Slack絵文字名を表示に使うか（任意） | `false` |
 
 ### 4. ローカル開発
 
@@ -80,7 +80,7 @@ uv sync
 
 # 環境変数の設定
 cp .env.example .env
-# .env を編集して GCP_PROJECT_ID, Slack設定, CURATOR_TOPIC を設定
+# .env を編集して GCP_PROJECT_ID, Slack設定, TOPICS_CONFIG を設定
 
 # 実行
 uv run python -m src.main
@@ -117,16 +117,6 @@ uv run python -m src.main
 
 **設定方法**: GitHub リポジトリの Settings → Secrets and variables → Actions → Variables で `TOPICS_CONFIG` を作成し、上記 JSON を貼り付け。
 
-### 単一トピックモード（レガシー）
-
-`TOPICS_CONFIG` が未設定の場合、従来の環境変数を使用します：
-
-```
-CURATOR_TOPIC=AI生成ゲーム
-SLACK_CHANNEL_ID=C0XXXXXXX
-SLACK_HEADER=🎮 AI生成ゲーム ニュース（任意）
-```
-
 ## 使用例
 
 ### 複数トピックの設定例
@@ -137,12 +127,6 @@ SLACK_HEADER=🎮 AI生成ゲーム ニュース（任意）
   {"name": "スタートアップ 資金調達", "channel_id": "C222...", "header": "💰 スタートアップ ニュース"},
   {"name": "Web3 ブロックチェーン", "channel_id": "C333...", "header": "⛓️ Web3 ニュース"}
 ]
-```
-
-### 単一トピックの設定例
-
-```
-CURATOR_TOPIC=大規模言語モデル LLM
 ```
 
 ## アーキテクチャ
