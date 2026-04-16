@@ -34,10 +34,14 @@ jobs:
           GCP_LOCATION: ${{ vars.GCP_LOCATION != '' && vars.GCP_LOCATION || 'asia-northeast1' }}
           MODEL_NAME: ${{ vars.MODEL_NAME != '' && vars.MODEL_NAME || 'gemini-2.5-pro' }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           # Topic configuration (JSON array)
           # Example: [{"name": "生成AI", "channel_id": "C123...", "header": "🤖 生成AI ニュース", "unfurl_links": true}]
           # unfurl_links, unfurl_media can be set per topic (optional, default: false)
           TOPICS_CONFIG: ${{ vars.TOPICS_CONFIG }}
+          # News source
+          # google_search (default) or x_news
+          NEWS_SOURCE: ${{ vars.NEWS_SOURCE != '' && vars.NEWS_SOURCE || 'google_search' }}
           # Display settings
           USE_EMOJI_NAMES: ${{ vars.USE_EMOJI_NAMES != '' && vars.USE_EMOJI_NAMES || 'false' }}
         run: uv run python -m src.main
