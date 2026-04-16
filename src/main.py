@@ -4,9 +4,10 @@ import sys
 
 from dotenv import load_dotenv
 
-from .config import Config
+from .config import Config, NewsSource
 from .news_curator import NewsCurator
 from .slack_poster import SlackPoster
+from .x_news_client import XNewsClient
 
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -25,7 +26,10 @@ def main() -> int:
         logger.info("Configuration loaded successfully")
         logger.info(f"Found {len(config.topics)} topic(s) to process")
 
+        logger.info(f"News source: {config.news_source.value}")
+
         curator = NewsCurator(config)
+        x_client = XNewsClient(config.x_bearer_token) if config.x_bearer_token else None
         all_success = True
 
         for topic in config.topics:
@@ -37,8 +41,20 @@ def main() -> int:
             logger.info("Fetching recent URLs from Slack...")
             exclude_urls = poster.fetch_recent_urls()
 
-            logger.info("Fetching news with Google Search grounding...")
-            items = curator.fetch_news(topic.name, exclude_urls=exclude_urls)
+            if config.news_source == NewsSource.X_NEWS:
+                logger.info("Fetching news from X News API...")
+                stories = x_client.search(topic.query, max_results=50)
+                if stories:
+                    stories = curator.filter_stories(topic.name, stories)
+                    logger.info(f"Formatting {len(stories)} stories with LLM...")
+                    items = curator.fetch_news_from_articles(topic.name, stories)
+                else:
+                    logger.warning("X News API returned no results, falling back to Google Search grounding")
+                    items = curator.fetch_news(topic.query, exclude_urls=exclude_urls)
+            else:
+                logger.info("Fetching news with Google Search grounding...")
+                items = curator.fetch_news(topic.query, exclude_urls=exclude_urls)
+
             logger.info(f"Received {len(items)} news items")
             for i, item in enumerate(items):
                 logger.debug(f"Item {i + 1}: {item.text[:100]}...")
